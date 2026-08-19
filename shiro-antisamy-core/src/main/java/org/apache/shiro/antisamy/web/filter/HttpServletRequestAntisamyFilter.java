@@ -1,0 +1,170 @@
+package org.apache.shiro.antisamy.web.filter;
+
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.shiro.antisamy.AntisamyProperties;
+import org.apache.shiro.antisamy.cache.AntiSamyCacheManager;
+import org.apache.shiro.antisamy.cache.AntiSamyWrapper;
+import org.apache.shiro.antisamy.web.servlet.http.HttpServletAntiSamyRequestWrapper;
+import org.apache.shiro.web.filter.AccessControlFilter;
+import org.owasp.validator.html.PolicyException;
+import org.springframework.util.AntPathMatcher;
+import org.springframework.util.PathMatcher;
+import org.springframework.web.util.UrlPathHelper;
+
+/**
+ * Antisamy XSS(Cross Site Scripting)，request
+ * @author <a href="https://github.com/loong10k">Loong Wan</a>
+ * @since 1.0.0
+ */
+public class HttpServletRequestAntisamyFilter extends AccessControlFilter {
+	
+
+	/** 路径解析工具 */
+	protected UrlPathHelper urlPathHelper = new UrlPathHelper();
+	/** 路径规则匹配工具 */
+	protected PathMatcher pathMatcher = new AntPathMatcher();
+	/** AntiSamy 对象缓存管理*/
+	protected final AntiSamyCacheManager antiSamyCacheManager;
+	/** Antisamy 配置 */
+	protected final AntisamyProperties properties;
+	
+	/**
+	 * Constructs a new http servlet request antisamy filter instance.
+	 *
+	 * @param antiSamyCacheManager the anti samy cache manager
+	 * @param properties the properties
+	 */
+	public HttpServletRequestAntisamyFilter(AntiSamyCacheManager antiSamyCacheManager, AntisamyProperties properties) {
+		this.antiSamyCacheManager = antiSamyCacheManager;
+		this.properties = properties;
+	}
+	
+	@Override
+	/** Returns whether the access allowed is enabled.
+	 * @param request the request
+	 * @param response the response
+	 * @param mappedValue the mappedValue
+	 * @return the result
+	 */
+	protected boolean isAccessAllowed(ServletRequest request, ServletResponse response, Object mappedValue)
+			throws Exception {
+		return true;
+	}
+	
+	/**
+	 * Determines whether on access denied.
+	 *
+	 * @param request the request
+	 * @param response the response
+	 * @return the result
+	 * @throws Exception if an error occurs
+	 */
+	@Override
+	protected boolean onAccessDenied(ServletRequest request, ServletResponse response) throws Exception {
+		return true;
+	}
+	
+	/**
+	 * execute Chain.
+	 *
+	 * @param request the request
+	 * @param response the response
+	 * @param filterChain the filter chain
+	 * @throws Exception if an error occurs
+	 */
+	@Override
+	protected void executeChain(ServletRequest request, ServletResponse response, FilterChain filterChain) throws Exception {
+
+		if (!(request instanceof HttpServletRequest) || !(response instanceof HttpServletResponse)) {
+			throw new ServletException( "just supports HTTP requests");
+		}
+		
+		HttpServletRequest httpRequest = (HttpServletRequest) request;
+		HttpServletResponse httpResponse = (HttpServletResponse) response;
+		
+		// Cast to jakarta type for Spring 6 API calls (at runtime the container provides jakarta objects)
+		jakarta.servlet.http.HttpServletRequest jakartaRequest = (jakarta.servlet.http.HttpServletRequest) (Object) request;
+		
+		if (this.matches(jakartaRequest)) {
+			//根据请求获取响应的
+			AntiSamyWrapper antiSamyWrapper = this.getAntiSamyWrapperForRequest(jakartaRequest);
+			filterChain.doFilter(new HttpServletAntiSamyRequestWrapper(antiSamyWrapper, httpRequest), httpResponse);
+		} else {
+			filterChain.doFilter(request,response);
+		}
+		 
+	}
+	
+	/**
+	 * Determines whether matches.
+	 *
+	 * @param request the request
+	 * @return the result
+	 */
+	protected boolean matches(jakarta.servlet.http.HttpServletRequest request) {
+		String lookupPath = this.urlPathHelper.getLookupPathForRequest(request);
+		return this.matches(lookupPath, this.pathMatcher);
+	}
+	
+	/**
+	 * Returns {@code true} if the interceptor applies to the given request path.
+	 * @param lookupPath the current request path
+	 * @param pathMatcher a path matcher for path pattern matching
+	 */
+	protected boolean matches(String lookupPath, PathMatcher pathMatcher) {
+		PathMatcher pathMatcherToUse = pathMatcher == null ? this.pathMatcher : pathMatcher;
+		if (ArrayUtils.isNotEmpty(properties.getExcludePatterns())) {
+			for (String pattern : properties.getExcludePatterns()) {
+				if (pathMatcherToUse.match(pattern, lookupPath)) {
+					return false;
+				}
+			}
+		}
+		if (ArrayUtils.isEmpty(properties.getIncludePatterns())) {
+			return true;
+		}
+		else {
+			for (String pattern : properties.getIncludePatterns()) {
+				if (pathMatcherToUse.match(pattern, lookupPath)) {
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+	
+	/** Returns the anti samy wrapper for request.
+	 * @param request the request
+	 * @return the result
+	 */
+	protected AntiSamyWrapper getAntiSamyWrapperForRequest(jakarta.servlet.http.HttpServletRequest request) throws PolicyException {
+		//解析请求路径
+		String lookupPath = this.urlPathHelper.getLookupPathForRequest(request);
+		for (String pattern : properties.getPolicyMappings().keySet()) {
+			if (pathMatcher.match(pattern, lookupPath)) {
+				String policy = properties.getPolicyMappings().get(pattern);
+				return antiSamyCacheManager.getXssAntiSamyWrapper(policy, properties.getScanType(), properties.getPolicyHeaders());
+			}
+		}
+		return antiSamyCacheManager.getDefaultAntiSamyWrapper(properties.getScanType(), properties.getPolicyHeaders());
+	}
+	
+	/**
+	 * destroy.
+	 *
+	 */
+	@Override
+	public void destroy() {
+		super.destroy();
+		antiSamyCacheManager.destroy();
+	}
+ 
+
+}
