@@ -45,6 +45,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Dependency versions -->
         <revision>3.0.x.20260630-SNAPSHOT</revision>
+        <antisamy.version>1.7.8</antisamy.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <easy4j-shiro-extension.version>3.0.x.20260630-SNAPSHOT</easy4j-shiro-extension.version>
         <fastjson.version>2.0.62</fastjson.version>
@@ -55,6 +56,7 @@
         <shiro.version>2.2.1</shiro.version>
         <slf4j.version>2.0.18</slf4j.version>
         <spring.version>5.3.30</spring.version>
+        <spring-boot.version>2.7.18</spring-boot.version>
         <!-- Maven Plugin versions -->
         <maven-central-publishing-plugin.version>0.11.0</maven-central-publishing-plugin.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
@@ -113,6 +115,11 @@
                 <version>${guava.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.owasp.antisamy</groupId>
+                <artifactId>antisamy</artifactId>
+                <version>${antisamy.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.springframework</groupId>
                 <artifactId>spring-context</artifactId>
                 <version>${spring.version}</version>
@@ -121,6 +128,11 @@
                 <groupId>org.springframework</groupId>
                 <artifactId>spring-web</artifactId>
                 <version>${spring.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-autoconfigure</artifactId>
+                <version>${spring-boot.version}</version>
             </dependency>
             <dependency>
                 <groupId>javax.servlet</groupId>
